@@ -1,0 +1,2207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>MotorMind — Decoding imagined movement from EEG</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="An open-source motor-imagery brain-computer interface built on public EEG data. Live in-browser demo, methodology, and research log.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#16243E; --panel:#EDF1F4; --surface:#FFFFFF;
+    --trace:#1E8F86; --amber:#E08D3C; --slate:#6B7A8F;
+    --border:rgba(22,36,62,.14); --radius:10px;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--panel);color:var(--ink);
+    font-family:'IBM Plex Sans',sans-serif;line-height:1.65;}
+  h1,h2,h3{font-family:'Space Grotesk',sans-serif;font-weight:500;margin:0 0 .6em;}
+  p{color:var(--ink);}
+  a{color:var(--trace);}
+  .mono{font-family:'IBM Plex Mono',monospace;}
+  .eyebrow{display:block;font-family:'IBM Plex Mono',monospace;font-size:.72rem;
+    letter-spacing:.09em;text-transform:uppercase;color:var(--slate);margin-bottom:.6em;}
+  .wrap{max-width:980px;margin:0 auto;padding:4rem 1.5rem;}
+  .band-surface{background:var(--surface);border-top:.5px solid var(--border);border-bottom:.5px solid var(--border);}
+
+  /* nav */
+  nav{position:sticky;top:0;z-index:50;background:rgba(255,255,255,.92);
+    backdrop-filter:saturate(180%) blur(6px);border-bottom:.5px solid var(--border);}
+  .navwrap{max-width:980px;margin:0 auto;padding:.9rem 1.5rem;display:flex;
+    align-items:center;justify-content:space-between;}
+  .brand{font-family:'Space Grotesk',sans-serif;font-weight:500;font-size:1.05rem;
+    color:var(--ink);text-decoration:none;}
+  .navlinks{display:flex;gap:1.4rem;list-style:none;margin:0;padding:0;}
+  .navlinks a{color:var(--slate);text-decoration:none;font-size:.9rem;}
+  .navlinks a:hover{color:var(--ink);}
+  @media (max-width:700px){.navlinks{display:none;}}
+
+  /* hero trace strip */
+  .tracestrip{position:relative;width:100%;height:220px;background:var(--surface);
+    border-bottom:.5px solid var(--border);overflow:hidden;}
+  #traceCanvas{display:block;width:100%;height:100%;}
+
+  .hero{padding:3rem 1.5rem 3.5rem;}
+  .herowrap{max-width:760px;margin:0 auto;}
+  h1.title{font-size:clamp(2rem,4.6vw,3.1rem);letter-spacing:-.01em;line-height:1.12;}
+  .sub{color:var(--slate);max-width:560px;font-size:1.05rem;}
+  .ctas{display:flex;gap:.7rem;flex-wrap:wrap;margin-top:1.6rem;}
+  .btn{font-family:'IBM Plex Sans',sans-serif;font-size:.9rem;font-weight:500;
+    padding:.65rem 1.1rem;border-radius:var(--radius);text-decoration:none;
+    border:1px solid var(--border);cursor:pointer;display:inline-block;}
+  .btn.primary{background:var(--ink);color:#fff;border-color:var(--ink);}
+  .btn.ghost{background:transparent;color:var(--ink);}
+  .btn:hover{opacity:.85;}
+
+  /* how it works */
+  .steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1.6rem;margin-top:2rem;}
+  .step .num{font-family:'IBM Plex Mono',monospace;color:var(--trace);font-size:.85rem;margin-bottom:.4em;display:block;}
+  .step h3{font-size:1.02rem;margin-bottom:.3em;}
+  .step p{color:var(--slate);font-size:.92rem;margin:0;}
+
+  /* demo */
+  .trials{display:flex;flex-wrap:wrap;gap:.5rem;margin:1.6rem 0;}
+  .trialbtn{font-family:'IBM Plex Mono',monospace;font-size:.78rem;padding:.45rem .8rem;
+    border:1px solid var(--border);border-radius:999px;background:var(--surface);
+    color:var(--ink);cursor:pointer;}
+  .trialbtn.active{background:var(--ink);color:#fff;border-color:var(--ink);}
+  .demopanel{background:var(--surface);border:.5px solid var(--border);border-radius:var(--radius);
+    padding:1.4rem;}
+  #demoCanvas{display:block;width:100%;height:140px;}
+  .demostatus{font-family:'IBM Plex Mono',monospace;font-size:.82rem;color:var(--slate);
+    min-height:1.4em;margin:.8rem 0;}
+  .resultrow{display:none;margin-top:1rem;}
+  .resultrow.show{display:block;}
+  .badge{display:inline-block;font-family:'IBM Plex Mono',monospace;font-size:.78rem;
+    padding:.25rem .6rem;border-radius:999px;margin-bottom:1rem;}
+  .badge.correct{background:#E1F0EC;color:#0F6E56;}
+  .badge.incorrect{background:#FAECE7;color:#993C1D;}
+  .confbar-row{display:flex;align-items:center;gap:.7rem;margin-bottom:.5rem;font-size:.85rem;}
+  .confbar-label{width:90px;flex-shrink:0;font-family:'IBM Plex Mono',monospace;color:var(--slate);}
+  .confbar-track{flex:1;height:8px;background:var(--panel);border-radius:4px;overflow:hidden;}
+  .confbar-fill{display:block;height:100%;width:0%;background:var(--trace);transition:width .6s ease;}
+  .confbar-fill.true{background:var(--amber);}
+  .confbar-val{width:42px;text-align:right;font-family:'IBM Plex Mono',monospace;color:var(--slate);}
+
+  /* results */
+  .statusnote{font-family:'IBM Plex Mono',monospace;font-size:.8rem;color:var(--slate);
+    border:1px dashed var(--border);border-radius:var(--radius);padding:.8rem 1rem;margin-bottom:2rem;}
+  .metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:2.4rem;}
+  .metric{background:var(--panel);border-radius:var(--radius);padding:1rem;}
+  .metric .label{font-size:.78rem;color:var(--slate);margin-bottom:.3em;}
+  .metric .value{font-size:1.5rem;font-family:'Space Grotesk',sans-serif;}
+  .figs{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:1.4rem;}
+  .figcard{background:var(--panel);border-radius:var(--radius);padding:1rem;}
+  .figcard img{width:100%;border-radius:6px;display:block;}
+  .figplaceholder{display:none;font-family:'IBM Plex Mono',monospace;font-size:.8rem;
+    color:var(--slate);padding:2.5rem 1rem;text-align:center;border:1px dashed var(--border);border-radius:6px;}
+  .figcard .capt{font-size:.8rem;color:var(--slate);margin-top:.6em;}
+
+  /* research log */
+  .logentry{display:grid;grid-template-columns:110px 1fr;gap:1.2rem;padding:1.1rem 0;
+    border-top:.5px solid var(--border);}
+  .logentry:first-of-type{border-top:none;}
+  .logentry .when{font-family:'IBM Plex Mono',monospace;font-size:.8rem;color:var(--slate);}
+  .logentry h3{font-size:1rem;margin-bottom:.3em;}
+  .logentry p{color:var(--slate);font-size:.92rem;margin:0;}
+
+  footer{padding:2.6rem 1.5rem;}
+  .footwrap{max-width:980px;margin:0 auto;display:flex;flex-wrap:wrap;gap:1.5rem;
+    justify-content:space-between;align-items:center;border-top:.5px solid var(--border);padding-top:1.6rem;}
+  .footlinks{display:flex;gap:1.2rem;list-style:none;padding:0;margin:0;}
+  .footlinks a{color:var(--slate);text-decoration:none;font-size:.85rem;}
+  footer .fine{font-size:.78rem;color:var(--slate);}
+
+  @media (prefers-reduced-motion: reduce){ * { scroll-behavior:auto !important; } }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="navwrap">
+    <a class="brand" href="#top">MotorMind</a>
+    <ul class="navlinks">
+      <li><a href="#why">Why</a></li>
+      <li><a href="#how">How it works</a></li>
+      <li><a href="#demo">Live demo</a></li>
+      <li><a href="#results">Results</a></li>
+      <li><a href="#log">Research log</a></li>
+      <li><a href="https://github.com/" target="_blank" rel="noopener">Code</a></li>
+    </ul>
+  </div>
+</nav>
+
+<div id="top" class="tracestrip"><canvas id="traceCanvas"></canvas></div>
+
+<header class="hero">
+  <div class="herowrap">
+    <span class="eyebrow">An open BCI passion project</span>
+    <h1 class="title">Decoding imagined movement from EEG</h1>
+    <p class="sub">A from-scratch motor-imagery brain-computer interface, built on public,
+      de-identified EEG recordings — no lab required to get started. Watch the model
+      decode whether someone imagined moving their left hand, right hand, or feet,
+      straight from their brainwaves.</p>
+    <div class="ctas">
+      <a class="btn primary" href="#demo">Try the live demo</a>
+      <a class="btn ghost" href="#log">Read the research log</a>
+      <a class="btn ghost" href="https://github.com/" target="_blank" rel="noopener">View code on GitHub</a>
+    </div>
+  </div>
+</header>
+
+<main>
+  <section id="why">
+    <div class="wrap">
+      <span class="eyebrow">Why it matters</span>
+      <h2>The same decoding problem behind real assistive tech</h2>
+      <p>People living with paralysis or locked-in syndrome can still generate the same
+        motor-cortex signals as anyone else when they imagine moving — the connection
+        from brain to limb is broken, not the intention itself. Brain-computer interfaces
+        exploit exactly that: read the imagined-movement signal, decode which movement
+        was intended, and use it to drive a cursor, a wheelchair, or a speller. This
+        project is a small, transparent, fully open-source attempt to build that
+        decoding step from first principles, using the same public dataset that
+        BCI researchers have used for two decades.</p>
+    </div>
+  </section>
+
+  <section id="how" class="band-surface">
+    <div class="wrap">
+      <span class="eyebrow">How it works</span>
+      <h2>Four steps from raw signal to predicted movement</h2>
+      <div class="steps">
+        <div class="step">
+          <span class="num mono">01</span>
+          <h3>Raw EEG</h3>
+          <p>64-channel scalp recordings while a subject imagines moving their left
+            hand, right hand, or feet, cued by an on-screen prompt.</p>
+        </div>
+        <div class="step">
+          <span class="num mono">02</span>
+          <h3>Band-pass filter</h3>
+          <p>Keep only the 7–30 Hz mu and beta rhythms — the frequency bands that
+            measurably change power during imagined movement.</p>
+        </div>
+        <div class="step">
+          <span class="num mono">03</span>
+          <h3>CSP feature extraction</h3>
+          <p>Common Spatial Patterns finds the electrode combinations that best
+            separate the imagined classes from each other.</p>
+        </div>
+        <div class="step">
+          <span class="num mono">04</span>
+          <h3>LDA classifier</h3>
+          <p>A linear classifier turns those features into a predicted class and a
+            confidence score for each option.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="demo">
+    <div class="wrap">
+      <span class="eyebrow">Live demo</span>
+      <h2>Pick a trial and watch it decode</h2>
+      <p class="sub">Each sample below is a real held-out EEG trial. Press a sample, then
+        Decode — the model has never seen this exact trial during training.</p>
+      <div class="trials" id="trialButtons"></div>
+      <div class="demopanel">
+        <canvas id="demoCanvas"></canvas>
+        <div class="demostatus" id="demoStatus">Select a sample to begin.</div>
+        <button class="btn primary" id="decodeBtn" disabled>Decode</button>
+        <div class="resultrow" id="resultRow">
+          <span class="badge" id="resultBadge"></span>
+          <div id="confbars"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="results" class="band-surface">
+    <div class="wrap">
+      <span class="eyebrow">Results</span>
+      <h2>How well does it actually work?</h2>
+      <div class="statusnote" id="statusNote"></div>
+      <div class="metrics" id="metricCards"></div>
+      <div class="figs">
+        <div class="figcard">
+          <img id="cmImg" src="assets/figures/confusion_matrix.png" alt="Confusion matrix of predicted vs true movement class"
+            onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+          <div class="figplaceholder">Confusion matrix will appear here after running
+            <span class="mono">src/train_model.py</span></div>
+          <p class="capt">Confusion matrix, pooled across subjects' held-out folds.</p>
+        </div>
+        <div class="figcard">
+          <img id="cspImg" src="assets/figures/csp_patterns.png" alt="CSP spatial patterns over the scalp"
+            onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+          <div class="figplaceholder">CSP spatial patterns will appear here after running
+            <span class="mono">src/train_model.py</span></div>
+          <p class="capt">Spatial patterns the model relies on most for the best-performing subject.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="log">
+    <div class="wrap">
+      <span class="eyebrow">Research log</span>
+      <h2>How this project actually went</h2>
+      <p class="sub">Notes from actually building this, kept as I went rather than
+        reconstructed afterward.</p>
+      <div class="logentries">
+        <div class="logentry">
+          <div class="when mono">Week 1</div>
+          <div><h3>Why I started this</h3>
+            <p>I've always been interested in neuroscience, but I wanted to actually
+              build something instead of just reading papers about it. Brain-computer
+              interfaces stood out because they sit right at the intersection of signal
+              processing, machine learning, and a genuinely meaningful application —
+              restoring movement and communication for people who've lost it. I didn't
+              have lab access or EEG hardware, so I started by figuring out what was
+              actually achievable with just a laptop and a public dataset.</p></div>
+        </div>
+        <div class="logentry">
+          <div class="when mono">Week 2–3</div>
+          <div><h3>First working pipeline</h3>
+            <p>The first real bug took a while to track down. After preprocessing,
+              every subject was getting skipped by the training script with a
+              "not enough classes" error, even though each one clearly had 60+ trials.
+              It turned out I'd reused the same numeric code for two different movement
+              classes — right-fist and both-feet — since they came from separate
+              recording runs that happened to share the same underlying annotation
+              codes. When I combined the data, one class silently overwrote the other.
+              Fixing it meant assigning a unique code to each of the three classes
+              before combining anything, instead of relying on the codes built into
+              the raw annotations.</p></div>
+        </div>
+        <div class="logentry">
+          <div class="when mono">Next up</div>
+          <div><h3>Reaching out for mentorship</h3>
+            <p>I have a contact in radiology at Northwestern University and I'm
+              planning to reach out now that there's a working demo to actually show
+              them. The goal is a sanity check on the methodology from someone with
+              real BCI/EEG research experience, and to ask whether a short pilot
+              recording session on a research-grade EEG system might be possible —
+              which would let a future version of this project use real, original
+              data instead of only the public dataset.</p></div>
+        </div>
+        <div class="logentry">
+          <div class="when mono">Week 8+</div>
+          <div><h3>What I'd do with more time</h3>
+            <p>With the full pipeline working, the model reached 54.9% accuracy across
+              20 subjects on a 3-class problem where chance is 33.3% — a real signal,
+              but far from polished. The more interesting pattern isn't the overall
+              number: the model is much better at telling "both feet" apart from the
+              hand movements (precision/recall around 0.72–0.74) than at telling left
+              hand from right hand apart from each other (both around 0.46–0.55). That
+              tracks with what's known about the brain — the cortical regions
+              controlling the left and right hand sit close together, so the EEG
+              difference between them is genuinely subtler than the difference between
+              hands and feet. With more time, I'd want to try a deep-learning baseline
+              like EEGNet to see if it picks up the left/right distinction better, and
+              test whether a model trained on one person transfers to a new person at
+              all, since every result here is within-subject.</p></div>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="footwrap">
+    <span class="fine mono">MotorMind &mdash; last updated <span id="updatedDate"></span></span>
+    <ul class="footlinks">
+      <li><a href="https://github.com/" target="_blank" rel="noopener">GitHub</a></li>
+      <li><a href="#" id="preprintLink">Preprint</a></li>
+      <li><a href="mailto:you@example.com">Contact</a></li>
+    </ul>
+  </div>
+</footer>
+
+<script>
+// ============================================================================
+// REAL DATA — generated by src/train_model.py from the PhysioNet EEG Motor
+// Movement/Imagery dataset. To regenerate after a new training run, replace
+// this object with the contents of web/data/results.json.
+// ============================================================================
+const RESULTS = {
+  "generated_from": "real_pipeline",
+  "model": "CSP(6 components) + LDA",
+  "frequency_band_hz": [
+    7,
+    30
+  ],
+  "chance_level": 0.333,
+  "mean_accuracy": 0.5492,
+  "n_subjects": 20,
+  "n_trials_total": 1349,
+  "per_subject_accuracy": [
+    {
+      "subject": "subj001",
+      "accuracy": 0.8132,
+      "n_trials": 69
+    },
+    {
+      "subject": "subj002",
+      "accuracy": 0.4989,
+      "n_trials": 66
+    },
+    {
+      "subject": "subj003",
+      "accuracy": 0.6385,
+      "n_trials": 69
+    },
+    {
+      "subject": "subj004",
+      "accuracy": 0.5242,
+      "n_trials": 68
+    },
+    {
+      "subject": "subj005",
+      "accuracy": 0.5066,
+      "n_trials": 67
+    },
+    {
+      "subject": "subj006",
+      "accuracy": 0.4835,
+      "n_trials": 68
+    },
+    {
+      "subject": "subj007",
+      "accuracy": 0.8088,
+      "n_trials": 68
+    },
+    {
+      "subject": "subj008",
+      "accuracy": 0.7165,
+      "n_trials": 67
+    },
+    {
+      "subject": "subj009",
+      "accuracy": 0.5253,
+      "n_trials": 67
+    },
+    {
+      "subject": "subj010",
+      "accuracy": 0.4758,
+      "n_trials": 67
+    },
+    {
+      "subject": "subj011",
+      "accuracy": 0.7473,
+      "n_trials": 68
+    },
+    {
+      "subject": "subj012",
+      "accuracy": 0.456,
+      "n_trials": 68
+    },
+    {
+      "subject": "subj013",
+      "accuracy": 0.3527,
+      "n_trials": 68
+    },
+    {
+      "subject": "subj014",
+      "accuracy": 0.5758,
+      "n_trials": 66
+    },
+    {
+      "subject": "subj015",
+      "accuracy": 0.4505,
+      "n_trials": 68
+    },
+    {
+      "subject": "subj016",
+      "accuracy": 0.5593,
+      "n_trials": 66
+    },
+    {
+      "subject": "subj017",
+      "accuracy": 0.5451,
+      "n_trials": 66
+    },
+    {
+      "subject": "subj018",
+      "accuracy": 0.6308,
+      "n_trials": 68
+    },
+    {
+      "subject": "subj019",
+      "accuracy": 0.3187,
+      "n_trials": 68
+    },
+    {
+      "subject": "subj020",
+      "accuracy": 0.356,
+      "n_trials": 67
+    }
+  ],
+  "classification_report": {
+    "left_fist": {
+      "precision": 0.45569620253164556,
+      "recall": 0.4747252747252747,
+      "f1-score": 0.465016146393972,
+      "support": 455.0
+    },
+    "right_fist": {
+      "precision": 0.4660633484162896,
+      "recall": 0.46292134831460674,
+      "f1-score": 0.4644870349492672,
+      "support": 445.0
+    },
+    "both_feet": {
+      "precision": 0.7413394919168591,
+      "recall": 0.7149220489977728,
+      "f1-score": 0.7278911564625851,
+      "support": 449.0
+    },
+    "accuracy": 0.5507783543365455,
+    "macro avg": {
+      "precision": 0.5543663476215981,
+      "recall": 0.5508562240125514,
+      "f1-score": 0.552464779268608,
+      "support": 1349.0
+    },
+    "weighted avg": {
+      "precision": 0.5541893210287749,
+      "recall": 0.5507783543365455,
+      "f1-score": 0.5523366986014692,
+      "support": 1349.0
+    }
+  },
+  "demo_subject": "subj001",
+  "demo_channel": "C3",
+  "demo_trials": [
+    {
+      "id": "subj001_trial1",
+      "channel": "C3",
+      "true_label": "left_fist",
+      "predicted_label": "left_fist",
+      "confidence": {
+        "left_fist": 0.913,
+        "right_fist": 0.087,
+        "both_feet": 0.0
+      },
+      "trace": [
+        0.963,
+        -1.019,
+        -1.646,
+        -0.49,
+        0.343,
+        0.5,
+        0.235,
+        0.373,
+        0.176,
+        -0.204,
+        -0.28,
+        0.18,
+        1.269,
+        -0.447,
+        -0.775,
+        -0.818,
+        1.124,
+        -0.094,
+        -1.042,
+        -2.779,
+        3.937,
+        -1.256,
+        -2.667,
+        1.442,
+        1.401,
+        -1.175,
+        0.204,
+        -0.22,
+        2.126,
+        -0.339,
+        -0.36,
+        1.213,
+        1.082,
+        -0.786,
+        -1.18,
+        1.97,
+        0.395,
+        -2.127,
+        1.372,
+        0.643,
+        0.903,
+        -0.258,
+        -1.055,
+        1.22,
+        0.234,
+        0.383,
+        -0.65,
+        1.906,
+        -1.463,
+        -0.818,
+        0.149,
+        -0.231,
+        -2.013,
+        0.143,
+        -0.836,
+        1.745,
+        0.777,
+        0.009,
+        0.236,
+        0.463,
+        0.12,
+        0.796,
+        -0.578,
+        0.735,
+        0.535,
+        0.214,
+        0.717,
+        -0.217,
+        -0.269,
+        0.364,
+        0.077,
+        -0.314,
+        -0.788,
+        1.276,
+        -0.35,
+        -0.76,
+        0.458,
+        -1.434,
+        0.087,
+        -0.271,
+        -0.595,
+        -0.028,
+        -0.562,
+        -1.399,
+        -0.054,
+        0.019,
+        -0.985,
+        -0.511,
+        1.376,
+        1.004,
+        -0.283,
+        -0.994,
+        0.751,
+        0.805,
+        -0.02,
+        -1.618,
+        0.394,
+        0.509,
+        -0.435,
+        -0.696,
+        0.108,
+        0.076,
+        -0.537,
+        -0.619,
+        0.77,
+        -1.872,
+        2.605,
+        -1.055,
+        -0.378,
+        1.813,
+        -0.266,
+        -1.202,
+        -0.905,
+        -0.286,
+        1.205,
+        0.06,
+        -0.584,
+        1.747,
+        0.619,
+        -0.15,
+        0.444,
+        -0.221,
+        -0.783,
+        -0.882,
+        1.293,
+        -0.484,
+        -0.17,
+        0.326,
+        -1.881,
+        0.587,
+        -0.113,
+        0.233,
+        -1.237,
+        -0.107,
+        1.152,
+        0.719,
+        -1.088,
+        0.448,
+        0.483,
+        -0.141,
+        -0.361,
+        -0.969,
+        0.939,
+        0.831,
+        -0.645,
+        0.009,
+        0.599,
+        1.075,
+        -0.061,
+        -0.307
+      ]
+    },
+    {
+      "id": "subj001_trial2",
+      "channel": "C3",
+      "true_label": "left_fist",
+      "predicted_label": "left_fist",
+      "confidence": {
+        "left_fist": 0.983,
+        "right_fist": 0.014,
+        "both_feet": 0.003
+      },
+      "trace": [
+        -2.564,
+        1.926,
+        0.999,
+        -0.377,
+        -0.313,
+        -0.154,
+        0.476,
+        1.171,
+        -1.471,
+        -1.231,
+        1.846,
+        0.302,
+        -2.239,
+        1.036,
+        -0.078,
+        1.457,
+        -0.832,
+        -0.824,
+        0.393,
+        0.38,
+        0.51,
+        -1.231,
+        0.474,
+        1.126,
+        0.124,
+        -1.035,
+        -0.678,
+        0.73,
+        1.583,
+        -1.776,
+        0.185,
+        0.204,
+        1.057,
+        -1.117,
+        -0.155,
+        -0.389,
+        0.788,
+        0.54,
+        -1.239,
+        -0.032,
+        -0.659,
+        1.047,
+        0.336,
+        -1.216,
+        0.286,
+        -0.152,
+        0.507,
+        0.886,
+        -0.497,
+        1.236,
+        -1.376,
+        -0.034,
+        2.013,
+        0.239,
+        -2.214,
+        -0.121,
+        2.934,
+        0.809,
+        -1.205,
+        -1.059,
+        0.356,
+        1.323,
+        -0.911,
+        0.341,
+        -1.332,
+        0.74,
+        0.3,
+        -0.768,
+        -0.279,
+        0.569,
+        0.685,
+        0.791,
+        -0.118,
+        0.25,
+        1.037,
+        -0.493,
+        -0.513,
+        -0.415,
+        -0.009,
+        -0.441,
+        -0.382,
+        -0.823,
+        1.079,
+        -0.003,
+        0.537,
+        -1.64,
+        3.599,
+        -2.188,
+        0.758,
+        1.079,
+        -1.026,
+        0.334,
+        0.878,
+        -0.504,
+        -1.235,
+        0.432,
+        0.421,
+        -0.77,
+        0.17,
+        -0.559,
+        0.728,
+        0.125,
+        -1.278,
+        0.648,
+        -0.858,
+        0.918,
+        0.66,
+        -0.13,
+        -0.527,
+        0.761,
+        0.4,
+        -1.375,
+        0.167,
+        -0.288,
+        0.027,
+        -0.373,
+        0.914,
+        -2.164,
+        -0.579,
+        1.504,
+        -0.314,
+        -0.861,
+        0.146,
+        -1.27,
+        1.731,
+        -1.433,
+        0.793,
+        -0.742,
+        0.883,
+        0.991,
+        -0.072,
+        0.059,
+        -0.128,
+        0.27,
+        0.59,
+        0.291,
+        0.875,
+        -0.217,
+        1.231,
+        -0.758,
+        -0.329,
+        -0.016,
+        -0.836,
+        0.105,
+        -1.222,
+        -1.328,
+        -1.109,
+        0.786,
+        -0.429,
+        0.428
+      ]
+    },
+    {
+      "id": "subj001_trial5",
+      "channel": "C3",
+      "true_label": "left_fist",
+      "predicted_label": "left_fist",
+      "confidence": {
+        "left_fist": 0.914,
+        "right_fist": 0.086,
+        "both_feet": 0.001
+      },
+      "trace": [
+        -0.23,
+        0.674,
+        -0.418,
+        -1.158,
+        0.278,
+        0.906,
+        -0.134,
+        -0.603,
+        0.187,
+        1.107,
+        -0.751,
+        -1.482,
+        2.157,
+        0.514,
+        -1.342,
+        0.11,
+        0.906,
+        0.55,
+        -0.507,
+        0.045,
+        0.476,
+        -0.324,
+        0.385,
+        0.804,
+        -1.561,
+        -0.468,
+        0.441,
+        -0.57,
+        0.485,
+        -1.007,
+        -0.371,
+        0.02,
+        -0.109,
+        0.535,
+        -0.045,
+        -0.137,
+        1.704,
+        -1.265,
+        0.292,
+        2.105,
+        0.173,
+        -0.484,
+        -0.498,
+        0.266,
+        1.265,
+        -1.888,
+        -0.62,
+        0.571,
+        0.812,
+        -0.313,
+        -0.517,
+        -0.496,
+        0.43,
+        0.345,
+        1.216,
+        -0.535,
+        -0.367,
+        0.98,
+        0.791,
+        -1.995,
+        -0.321,
+        0.101,
+        0.848,
+        0.247,
+        -0.787,
+        1.211,
+        -0.013,
+        -0.647,
+        0.638,
+        0.026,
+        -0.293,
+        1.231,
+        -1.871,
+        1.146,
+        -2.335,
+        0.276,
+        0.318,
+        0.079,
+        -0.23,
+        0.064,
+        0.362,
+        -0.569,
+        0.636,
+        -0.766,
+        0.281,
+        0.21,
+        -0.26,
+        -0.623,
+        0.363,
+        0.2,
+        -0.395,
+        -0.098,
+        1.067,
+        -0.94,
+        1.514,
+        -1.335,
+        0.364,
+        1.319,
+        -0.852,
+        -1.183,
+        -0.851,
+        3.651,
+        -3.28,
+        -0.067,
+        0.59,
+        1.949,
+        -0.544,
+        -0.906,
+        -0.558,
+        0.727,
+        -1.178,
+        -1.41,
+        0.385,
+        0.01,
+        0.596,
+        0.091,
+        -0.631,
+        0.224,
+        1.236,
+        0.192,
+        -0.115,
+        0.264,
+        -0.047,
+        0.081,
+        1.291,
+        -1.586,
+        1.195,
+        -0.652,
+        -0.042,
+        0.668,
+        -1.159,
+        0.53,
+        -1.987,
+        -0.033,
+        -1.035,
+        0.726,
+        -0.695,
+        1.345,
+        -1.336,
+        -0.051,
+        -0.033,
+        0.293,
+        0.102,
+        0.654,
+        2.722,
+        -2.751,
+        -0.316,
+        -0.934,
+        2.115,
+        0.242
+      ]
+    },
+    {
+      "id": "subj001_trial0",
+      "channel": "C3",
+      "true_label": "right_fist",
+      "predicted_label": "left_fist",
+      "confidence": {
+        "left_fist": 0.097,
+        "right_fist": 0.903,
+        "both_feet": 0.0
+      },
+      "trace": [
+        1.341,
+        -1.082,
+        -0.325,
+        0.195,
+        -0.099,
+        -1.561,
+        0.306,
+        0.784,
+        -1.984,
+        -1.233,
+        0.946,
+        -0.687,
+        -1.217,
+        0.998,
+        0.704,
+        0.441,
+        -0.087,
+        -0.798,
+        -1.016,
+        1.137,
+        -0.569,
+        0.728,
+        -0.077,
+        -0.799,
+        0.483,
+        -0.295,
+        0.063,
+        0.042,
+        1.019,
+        0.018,
+        -0.303,
+        0.977,
+        -1.031,
+        -0.423,
+        0.382,
+        -0.423,
+        -0.854,
+        -2.526,
+        0.528,
+        -0.131,
+        0.979,
+        -1.532,
+        -0.687,
+        0.454,
+        1.05,
+        -1.369,
+        -0.773,
+        0.3,
+        0.242,
+        -0.691,
+        -0.859,
+        -1.099,
+        0.619,
+        1.363,
+        -1.015,
+        0.816,
+        0.056,
+        -0.289,
+        1.023,
+        -0.557,
+        -0.293,
+        1.089,
+        0.154,
+        0.313,
+        0.54,
+        0.133,
+        0.06,
+        -0.212,
+        2.158,
+        -3.221,
+        0.96,
+        1.214,
+        -0.61,
+        -1.703,
+        0.35,
+        2.309,
+        -1.346,
+        -0.934,
+        1.544,
+        1.265,
+        -0.932,
+        0.232,
+        0.207,
+        0.701,
+        -1.233,
+        -0.823,
+        0.267,
+        -0.443,
+        -0.987,
+        2.217,
+        0.014,
+        -1.575,
+        0.887,
+        0.506,
+        -0.013,
+        -1.752,
+        0.254,
+        2.316,
+        -0.021,
+        -0.793,
+        1.112,
+        0.327,
+        0.234,
+        1.255,
+        1.063,
+        1.011,
+        -1.262,
+        -0.484,
+        0.845,
+        -0.906,
+        -0.486,
+        1.103,
+        1.48,
+        -0.857,
+        0.848,
+        0.996,
+        0.502,
+        -0.028,
+        -0.124,
+        1.057,
+        -0.969,
+        0.849,
+        0.363,
+        -0.293,
+        -2.425,
+        2.387,
+        -0.363,
+        -0.185,
+        -0.511,
+        0.837,
+        -1.137,
+        0.607,
+        -0.693,
+        -0.029,
+        -1.449,
+        0.892,
+        -1.188,
+        1.352,
+        -0.388,
+        -0.543,
+        -0.337,
+        1.587,
+        -0.251,
+        -0.245,
+        -0.407,
+        0.778,
+        -0.582,
+        -1.111,
+        0.557,
+        0.809
+      ]
+    },
+    {
+      "id": "subj001_trial3",
+      "channel": "C3",
+      "true_label": "right_fist",
+      "predicted_label": "right_fist",
+      "confidence": {
+        "left_fist": 0.025,
+        "right_fist": 0.975,
+        "both_feet": 0.0
+      },
+      "trace": [
+        0.438,
+        0.291,
+        -1.848,
+        0.862,
+        -0.611,
+        -0.407,
+        0.083,
+        -1.197,
+        2.552,
+        -1.946,
+        -0.92,
+        0.699,
+        1.029,
+        0.455,
+        0.641,
+        1.573,
+        -0.952,
+        3.16,
+        -1.213,
+        0.959,
+        1.01,
+        -1.887,
+        -0.662,
+        0.11,
+        0.538,
+        -0.177,
+        1.009,
+        -0.771,
+        -0.115,
+        0.429,
+        1.019,
+        -0.996,
+        0.367,
+        0.122,
+        -0.314,
+        2.197,
+        -2.968,
+        -1.335,
+        0.629,
+        1.325,
+        -0.309,
+        -0.276,
+        1.361,
+        -0.165,
+        -0.78,
+        -0.412,
+        2.427,
+        -0.703,
+        0.454,
+        0.093,
+        0.01,
+        1.251,
+        -0.081,
+        0.431,
+        -0.442,
+        0.163,
+        1.202,
+        -0.438,
+        -1.361,
+        1.033,
+        -0.589,
+        0.112,
+        -0.117,
+        -1.201,
+        0.748,
+        0.087,
+        -1.661,
+        -0.256,
+        0.762,
+        0.074,
+        -1.671,
+        0.621,
+        0.02,
+        -0.445,
+        1.275,
+        -0.402,
+        0.405,
+        -1.528,
+        0.988,
+        -0.726,
+        -0.61,
+        -0.447,
+        -1.365,
+        0.547,
+        0.031,
+        0.901,
+        0.322,
+        -1.704,
+        0.731,
+        1.57,
+        -0.11,
+        -0.026,
+        -0.928,
+        1.949,
+        -0.195,
+        -0.707,
+        -0.212,
+        0.603,
+        -0.583,
+        -0.037,
+        -0.888,
+        0.699,
+        -1.332,
+        1.032,
+        -2.242,
+        1.503,
+        -0.99,
+        0.576,
+        -0.066,
+        -0.165,
+        -0.414,
+        0.507,
+        -0.18,
+        -0.516,
+        0.673,
+        -0.255,
+        0.533,
+        0.179,
+        0.429,
+        -0.282,
+        -0.93,
+        0.752,
+        -1.298,
+        -0.111,
+        -0.414,
+        0.876,
+        -0.923,
+        0.681,
+        1.803,
+        0.828,
+        0.999,
+        -1.003,
+        0.885,
+        0.829,
+        -0.894,
+        -0.627,
+        -0.114,
+        0.255,
+        0.659,
+        -0.48,
+        -1.081,
+        -0.505,
+        0.373,
+        -0.8,
+        0.973,
+        -1.878,
+        -1.071,
+        1.766,
+        -0.8,
+        -0.412
+      ]
+    },
+    {
+      "id": "subj001_trial4",
+      "channel": "C3",
+      "true_label": "right_fist",
+      "predicted_label": "right_fist",
+      "confidence": {
+        "left_fist": 0.054,
+        "right_fist": 0.946,
+        "both_feet": 0.0
+      },
+      "trace": [
+        -0.756,
+        0.056,
+        0.542,
+        -1.604,
+        0.262,
+        0.702,
+        -0.634,
+        0.366,
+        0.397,
+        -1.937,
+        -1.012,
+        0.075,
+        0.636,
+        -1.218,
+        -0.562,
+        -1.393,
+        0.959,
+        1.447,
+        -0.415,
+        -1.072,
+        0.549,
+        1.649,
+        0.135,
+        -0.26,
+        0.171,
+        1.642,
+        -0.38,
+        0.163,
+        -0.523,
+        0.55,
+        0.255,
+        -0.082,
+        0.024,
+        -1.526,
+        -0.97,
+        2.284,
+        -0.823,
+        -0.662,
+        3.541,
+        -1.861,
+        -0.887,
+        0.445,
+        1.071,
+        -1.257,
+        -0.683,
+        -0.105,
+        1.716,
+        -1.67,
+        -0.436,
+        -0.113,
+        -0.418,
+        0.335,
+        -0.171,
+        -0.798,
+        0.163,
+        1.849,
+        0.545,
+        -0.206,
+        -0.084,
+        -0.239,
+        1.549,
+        0.006,
+        -1.074,
+        0.44,
+        0.123,
+        0.751,
+        0.232,
+        -0.845,
+        2.445,
+        -0.48,
+        -0.203,
+        -0.26,
+        -0.388,
+        0.576,
+        1.347,
+        -0.24,
+        -0.387,
+        0.677,
+        0.719,
+        -0.664,
+        0.706,
+        -0.689,
+        -0.561,
+        1.471,
+        0.344,
+        -0.736,
+        0.002,
+        0.71,
+        -0.783,
+        0.481,
+        -0.816,
+        0.832,
+        -0.255,
+        1.358,
+        -0.23,
+        0.074,
+        -0.953,
+        0.239,
+        1.281,
+        2.747,
+        -3.355,
+        0.183,
+        -0.14,
+        0.733,
+        0.077,
+        -1.834,
+        -0.07,
+        1.158,
+        -0.442,
+        -0.659,
+        -0.667,
+        0.424,
+        -0.179,
+        0.398,
+        -0.956,
+        -0.438,
+        0.913,
+        0.091,
+        -1.269,
+        0.149,
+        0.234,
+        0.117,
+        -1.339,
+        0.32,
+        -1.144,
+        0.207,
+        0.008,
+        0.368,
+        -1.489,
+        2.121,
+        0.025,
+        -1.239,
+        0.645,
+        1.219,
+        0.113,
+        0.625,
+        0.809,
+        -1.437,
+        1.009,
+        -0.019,
+        0.632,
+        -1.901,
+        1.834,
+        -0.789,
+        0.247,
+        0.057,
+        -0.532,
+        0.155,
+        -0.783,
+        -1.509
+      ]
+    },
+    {
+      "id": "subj001_trial45",
+      "channel": "C3",
+      "true_label": "both_feet",
+      "predicted_label": "both_feet",
+      "confidence": {
+        "left_fist": 0.015,
+        "right_fist": 0.029,
+        "both_feet": 0.956
+      },
+      "trace": [
+        1.387,
+        -0.177,
+        -0.167,
+        0.541,
+        -0.306,
+        -0.108,
+        -0.487,
+        0.197,
+        -0.601,
+        0.137,
+        0.239,
+        0.074,
+        -0.513,
+        0.133,
+        -0.85,
+        0.776,
+        -0.338,
+        -0.141,
+        -0.447,
+        -0.138,
+        -1.451,
+        -0.37,
+        1.051,
+        0.135,
+        -1.439,
+        0.193,
+        0.612,
+        -0.214,
+        -0.16,
+        -0.876,
+        0.695,
+        0.401,
+        -1.089,
+        0.164,
+        1.529,
+        0.112,
+        -0.229,
+        1.946,
+        -0.373,
+        0.807,
+        -1.584,
+        1.323,
+        -1.043,
+        -0.147,
+        -0.503,
+        1.169,
+        -0.871,
+        0.656,
+        0.389,
+        -1.249,
+        -1.149,
+        1.539,
+        0.239,
+        -0.721,
+        -0.11,
+        0.545,
+        -0.542,
+        0.344,
+        -0.454,
+        0.253,
+        -0.015,
+        1.193,
+        -1.259,
+        0.176,
+        0.182,
+        -0.753,
+        0.659,
+        -0.93,
+        1.502,
+        -0.392,
+        -0.95,
+        -0.838,
+        0.71,
+        -0.769,
+        -0.224,
+        0.528,
+        -0.18,
+        -1.386,
+        1.28,
+        -0.991,
+        0.829,
+        -0.998,
+        -0.661,
+        2.001,
+        -1.748,
+        0.907,
+        1.664,
+        0.187,
+        -0.335,
+        -0.753,
+        2.772,
+        -0.834,
+        -1.499,
+        0.485,
+        -0.923,
+        1.864,
+        0.365,
+        -1.234,
+        -1.6,
+        0.274,
+        1.033,
+        -1.909,
+        1.053,
+        0.236,
+        -1.635,
+        0.363,
+        0.319,
+        -0.359,
+        1.063,
+        0.273,
+        -0.724,
+        -1.308,
+        2.365,
+        1.215,
+        -1.717,
+        -0.052,
+        1.858,
+        -0.076,
+        -2.234,
+        0.914,
+        1.089,
+        1.038,
+        -0.158,
+        0.647,
+        1.135,
+        -2.065,
+        2.714,
+        -2.196,
+        -0.053,
+        1.81,
+        -0.441,
+        -0.267,
+        0.227,
+        0.116,
+        -0.524,
+        -0.638,
+        0.14,
+        -0.039,
+        0.266,
+        -0.279,
+        -0.487,
+        0.639,
+        -0.683,
+        0.129,
+        -1.175,
+        1.219,
+        -0.733,
+        1.475,
+        -1.512,
+        0.884
+      ]
+    },
+    {
+      "id": "subj001_trial46",
+      "channel": "C3",
+      "true_label": "both_feet",
+      "predicted_label": "both_feet",
+      "confidence": {
+        "left_fist": 0.001,
+        "right_fist": 0.0,
+        "both_feet": 0.999
+      },
+      "trace": [
+        1.009,
+        -0.844,
+        -0.301,
+        2.609,
+        -3.188,
+        1.466,
+        0.083,
+        -1.272,
+        1.156,
+        0.581,
+        -1.19,
+        -0.555,
+        1.0,
+        -0.031,
+        -0.633,
+        0.225,
+        0.818,
+        -0.203,
+        0.199,
+        -0.432,
+        0.207,
+        -0.072,
+        -0.345,
+        0.224,
+        0.397,
+        0.292,
+        0.167,
+        -0.98,
+        1.553,
+        -1.835,
+        0.618,
+        -0.499,
+        0.969,
+        -0.361,
+        -1.357,
+        0.951,
+        0.148,
+        0.889,
+        -0.246,
+        -0.357,
+        0.295,
+        0.549,
+        -0.252,
+        0.215,
+        -0.032,
+        1.318,
+        -0.32,
+        -0.954,
+        0.183,
+        -0.464,
+        0.616,
+        0.236,
+        0.258,
+        -1.442,
+        2.156,
+        -0.892,
+        -0.302,
+        1.194,
+        -0.08,
+        -0.649,
+        1.135,
+        -0.327,
+        0.209,
+        -1.107,
+        1.525,
+        0.238,
+        0.237,
+        -0.232,
+        0.89,
+        0.06,
+        -0.926,
+        0.18,
+        0.021,
+        -0.574,
+        0.073,
+        0.523,
+        -0.378,
+        -1.326,
+        1.141,
+        0.175,
+        0.203,
+        0.612,
+        -1.636,
+        2.636,
+        -2.042,
+        0.247,
+        0.751,
+        0.761,
+        0.072,
+        -1.411,
+        0.417,
+        -0.786,
+        -0.08,
+        0.997,
+        -1.001,
+        0.753,
+        -1.045,
+        1.034,
+        0.257,
+        -0.024,
+        0.024,
+        0.501,
+        0.447,
+        -0.799,
+        0.747,
+        -0.342,
+        0.734,
+        0.092,
+        -1.978,
+        2.064,
+        -1.295,
+        -0.688,
+        0.185,
+        0.116,
+        -0.947,
+        -0.889,
+        0.959,
+        -0.626,
+        -0.064,
+        -1.363,
+        1.392,
+        -0.737,
+        0.222,
+        -0.159,
+        -0.454,
+        0.542,
+        -1.481,
+        0.269,
+        -0.852,
+        0.79,
+        -1.086,
+        0.428,
+        -0.147,
+        0.686,
+        0.139,
+        -1.296,
+        4.131,
+        -2.915,
+        -0.369,
+        0.659,
+        0.504,
+        -0.973,
+        -1.36,
+        1.605,
+        -0.352,
+        -0.351,
+        0.355,
+        0.296,
+        0.226,
+        -1.333
+      ]
+    },
+    {
+      "id": "subj001_trial47",
+      "channel": "C3",
+      "true_label": "both_feet",
+      "predicted_label": "both_feet",
+      "confidence": {
+        "left_fist": 0.001,
+        "right_fist": 0.0,
+        "both_feet": 0.999
+      },
+      "trace": [
+        0.08,
+        0.338,
+        -0.109,
+        0.847,
+        -0.527,
+        0.434,
+        -0.981,
+        0.633,
+        1.21,
+        -0.51,
+        0.367,
+        0.256,
+        0.958,
+        -0.841,
+        1.802,
+        -1.098,
+        1.554,
+        -1.061,
+        -1.26,
+        1.643,
+        -2.098,
+        1.187,
+        0.143,
+        -0.802,
+        0.582,
+        -0.936,
+        -0.269,
+        -0.563,
+        0.837,
+        0.459,
+        0.757,
+        -0.587,
+        -0.603,
+        0.416,
+        -0.621,
+        -0.246,
+        0.746,
+        -1.532,
+        1.398,
+        0.967,
+        -0.601,
+        -0.9,
+        -0.513,
+        3.094,
+        -3.47,
+        -0.222,
+        -0.018,
+        1.784,
+        -1.873,
+        -0.224,
+        0.851,
+        0.441,
+        -0.784,
+        0.055,
+        1.718,
+        -0.801,
+        0.389,
+        0.161,
+        -0.216,
+        1.591,
+        -1.205,
+        0.072,
+        0.472,
+        0.56,
+        0.527,
+        -1.384,
+        0.723,
+        1.694,
+        0.196,
+        -0.703,
+        -0.747,
+        -0.507,
+        -1.825,
+        -0.538,
+        1.056,
+        -1.208,
+        -0.445,
+        0.342,
+        1.424,
+        -0.534,
+        -0.609,
+        -0.068,
+        1.167,
+        -0.191,
+        0.22,
+        0.575,
+        -1.121,
+        0.146,
+        0.231,
+        -0.833,
+        -0.551,
+        0.292,
+        0.486,
+        -0.478,
+        0.937,
+        -2.321,
+        2.328,
+        -0.797,
+        -0.126,
+        0.324,
+        -0.223,
+        -0.284,
+        0.528,
+        0.081,
+        -0.519,
+        0.735,
+        0.425,
+        -0.952,
+        1.082,
+        0.34,
+        0.337,
+        -1.38,
+        -0.26,
+        0.334,
+        -1.306,
+        0.745,
+        -0.588,
+        -0.131,
+        0.295,
+        0.796,
+        -1.052,
+        0.728,
+        -0.993,
+        1.747,
+        -0.451,
+        -0.488,
+        -0.468,
+        0.553,
+        -0.379,
+        -1.567,
+        -0.314,
+        1.502,
+        -0.494,
+        -0.603,
+        1.62,
+        -0.41,
+        0.709,
+        0.922,
+        0.103,
+        -0.036,
+        0.751,
+        -0.942,
+        -1.0,
+        0.293,
+        1.363,
+        -0.721,
+        -1.408,
+        0.841,
+        1.604,
+        -2.481
+      ]
+    }
+  ]
+};
+const CLASS_LABELS = {left_fist:"Left fist", right_fist:"Right fist", both_feet:"Both feet"};
+const CLASS_ORDER = ["left_fist","right_fist","both_feet"];
+
+document.getElementById("updatedDate").textContent =
+  new Date().toISOString().slice(0,10);
+
+// ---------- seeded RNG so placeholder demo is deterministic ----------
+function mulberry32(a){
+  return function(){
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
+function syntheticTrace(seed, nPoints){
+  const rnd = mulberry32(seed);
+  const arr = [];
+  let walk = 0;
+  for(let i=0;i<nPoints;i++){
+    walk += (rnd()-0.5)*0.6;
+    const wave = Math.sin(i*0.35 + seed) * 0.5 + Math.sin(i*0.09+seed*2)*0.3;
+    arr.push(walk*0.4 + wave);
+  }
+  return arr;
+}
+
+function syntheticConfidence(trueLabel, seed){
+  const rnd = mulberry32(seed*999);
+  const correct = rnd() < RESULTS.mean_accuracy;
+  let scores = {};
+  CLASS_ORDER.forEach(c => scores[c] = 0.15 + rnd()*0.25);
+  const winner = correct ? trueLabel : CLASS_ORDER[Math.floor(rnd()*3)];
+  scores[winner] += 0.5;
+  const total = Object.values(scores).reduce((a,b)=>a+b,0);
+  Object.keys(scores).forEach(k => scores[k] = scores[k]/total);
+  const predicted_label = Object.keys(scores).reduce((a,b)=> scores[a]>scores[b]?a:b);
+  return {predicted_label, confidence: scores};
+}
+
+// Real pipeline runs (train_model.py) include an actual "trace" array and real
+// "confidence"/"predicted_label" per trial. Older placeholder trials only have a
+// "seed", so we fall back to synthetic generation in that case.
+function getTrialTrace(trial){
+  if (Array.isArray(trial.trace)) return trial.trace;
+  return syntheticTrace(trial.seed, 150);
+}
+function getTrialResult(trial){
+  if (trial.confidence && trial.predicted_label){
+    return {predicted_label: trial.predicted_label, confidence: trial.confidence};
+  }
+  return syntheticConfidence(trial.true_label, trial.seed);
+}
+
+// ---------- hero animated multichannel trace ----------
+(function heroTrace(){
+  const canvas = document.getElementById("traceCanvas");
+  const ctx = canvas.getContext("2d");
+  const channels = ["Fp1","Fp2","C3","Cz","C4","P3","Pz","P4"];
+  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let buffers = [];
+  let rngs = channels.map((_,i)=>mulberry32(100+i*7));
+
+  function resize(){
+    const rect = canvas.parentElement.getBoundingClientRect();
+    canvas.width = Math.floor(rect.width);
+    canvas.height = Math.floor(rect.height);
+    buffers = channels.map((ch,i)=>{
+      const arr = new Float32Array(canvas.width);
+      const rnd = mulberry32(500+i*13);
+      let walk = 0;
+      for(let x=0;x<canvas.width;x++){
+        const t = x*0.018 + i;
+        walk += (rnd()-0.5)*0.18;
+        walk *= 0.985;
+        arr[x] = Math.sin(t*1.3)*0.45 + Math.sin(t*3.1)*0.2 + walk*0.5;
+      }
+      return arr;
+    });
+  }
+  resize();
+  window.addEventListener("resize", resize);
+
+  function step(){
+    channels.forEach((ch,i)=>{
+      const buf = buffers[i];
+      buf.copyWithin(0, 1);
+      const rnd = rngs[i];
+      const t = performance.now()*0.002 + i;
+      const val = Math.sin(t*1.3)*0.45 + Math.sin(t*3.1)*0.2 + (rnd()-0.5)*0.5;
+      buf[buf.length-1] = val;
+    });
+  }
+
+  function draw(){
+    ctx.fillStyle = "#FFFFFF";
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+    const rowH = canvas.height / channels.length;
+    ctx.lineWidth = 1.2;
+    ctx.strokeStyle = "#1E8F86";
+    channels.forEach((ch,i)=>{
+      const buf = buffers[i];
+      const baseline = rowH*(i+0.5);
+      ctx.beginPath();
+      for(let x=0;x<buf.length;x++){
+        const y = baseline - buf[x]*rowH*0.42;
+        if(x===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+      }
+      ctx.stroke();
+    });
+    channels.forEach((ch,i)=>{
+      const baseline = rowH*(i+0.5);
+      ctx.fillStyle = "rgba(255,255,255,0.88)";
+      ctx.fillRect(0, baseline-9, 34, 16);
+      ctx.fillStyle = "#6B7A8F";
+      ctx.font = "10px 'IBM Plex Mono', monospace";
+      ctx.fillText(ch, 4, baseline+3);
+    });
+  }
+
+  if(reduceMotion){
+    for(let i=0;i<canvas.width;i++) step();
+    draw();
+  } else {
+    function loop(){ step(); draw(); requestAnimationFrame(loop); }
+    requestAnimationFrame(loop);
+  }
+})();
+
+// ---------- live demo ----------
+let activeTrial = null;
+const trialButtonsEl = document.getElementById("trialButtons");
+const demoCanvas = document.getElementById("demoCanvas");
+const demoCtx = demoCanvas.getContext("2d");
+const demoStatus = document.getElementById("demoStatus");
+const decodeBtn = document.getElementById("decodeBtn");
+const resultRow = document.getElementById("resultRow");
+const resultBadge = document.getElementById("resultBadge");
+const confbars = document.getElementById("confbars");
+
+function sizeDemoCanvas(){
+  demoCanvas.width = Math.floor(demoCanvas.parentElement.clientWidth);
+  demoCanvas.height = 140;
+}
+window.addEventListener("resize", sizeDemoCanvas);
+
+RESULTS.demo_trials.forEach((trial, idx)=>{
+  const b = document.createElement("button");
+  b.className = "trialbtn";
+  b.textContent = "Sample " + (idx+1);
+  b.addEventListener("click", ()=> selectTrial(trial, b));
+  trialButtonsEl.appendChild(b);
+});
+
+function selectTrial(trial, btnEl){
+  activeTrial = trial;
+  document.querySelectorAll(".trialbtn").forEach(b=>b.classList.remove("active"));
+  btnEl.classList.add("active");
+  resultRow.classList.remove("show");
+  demoStatus.textContent = "Ready. Press Decode to run the classifier on this trial.";
+  decodeBtn.disabled = false;
+  const trace = getTrialTrace(trial);
+  drawTrace(trace, trace.length);
+}
+
+function drawTrace(trace, upTo){
+  sizeDemoCanvas();
+  const w = demoCanvas.width, h = demoCanvas.height;
+  demoCtx.fillStyle = "#FFFFFF";
+  demoCtx.fillRect(0,0,w,h);
+  demoCtx.strokeStyle = "#1E8F86";
+  demoCtx.lineWidth = 1.5;
+  demoCtx.beginPath();
+  const n = Math.max(2, upTo);
+  for(let i=0;i<n;i++){
+    const x = (i/(trace.length-1))*w;
+    const y = h/2 - trace[i]*h*0.28;
+    if(i===0) demoCtx.moveTo(x,y); else demoCtx.lineTo(x,y);
+  }
+  demoCtx.stroke();
+}
+
+decodeBtn.addEventListener("click", ()=>{
+  if(!activeTrial) return;
+  decodeBtn.disabled = true;
+  resultRow.classList.remove("show");
+  const trace = getTrialTrace(activeTrial);
+  demoStatus.textContent = "Reading trial...";
+  let frame = 0;
+  const totalFrames = 60;
+  function playFrame(){
+    frame++;
+    const upTo = Math.floor((frame/totalFrames)*trace.length);
+    drawTrace(trace, upTo);
+    if(frame < totalFrames){
+      requestAnimationFrame(playFrame);
+    } else {
+      demoStatus.textContent = "Decoding...";
+      setTimeout(reveal, 500);
+    }
+  }
+  playFrame();
+
+  function reveal(){
+    const {predicted_label, confidence} = getTrialResult(activeTrial);
+    const correct = predicted_label === activeTrial.true_label;
+    demoStatus.textContent = "True label: " + CLASS_LABELS[activeTrial.true_label] +
+      "  ·  Predicted: " + CLASS_LABELS[predicted_label];
+    resultBadge.textContent = correct ? "Correct" : "Incorrect";
+    resultBadge.className = "badge " + (correct ? "correct" : "incorrect");
+    confbars.innerHTML = "";
+    CLASS_ORDER.forEach(c=>{
+      const row = document.createElement("div");
+      row.className = "confbar-row";
+      const isTrue = c === activeTrial.true_label;
+      row.innerHTML =
+        '<span class="confbar-label">'+CLASS_LABELS[c]+'</span>' +
+        '<span class="confbar-track"><span class="confbar-fill'+(isTrue?' true':'')+'" data-val="'+(confidence[c]*100)+'"></span></span>' +
+        '<span class="confbar-val">'+Math.round(confidence[c]*100)+'%</span>';
+      confbars.appendChild(row);
+    });
+    resultRow.classList.add("show");
+    requestAnimationFrame(()=>{
+      document.querySelectorAll(".confbar-fill").forEach(el=>{
+        el.style.width = el.dataset.val + "%";
+      });
+    });
+    decodeBtn.disabled = false;
+  }
+});
+
+// ---------- results section ----------
+(function renderResults(){
+  const note = document.getElementById("statusNote");
+  if(RESULTS.generated_from === "placeholder"){
+    note.textContent = "Status: pipeline not yet run on real data — the numbers and " +
+      "figures below are illustrative placeholders. Run src/download_data.py, " +
+      "src/preprocess.py, then src/train_model.py, and paste the resulting " +
+      "web/data/results.json into the RESULTS constant above to replace them.";
+  } else {
+    note.style.display = "none";
+  }
+
+  const cards = [
+    {label:"Mean accuracy", value: Math.round(RESULTS.mean_accuracy*100)+"%"},
+    {label:"Chance level", value: Math.round(RESULTS.chance_level*100)+"%"},
+    {label:"Subjects", value: RESULTS.n_subjects},
+    {label:"Total trials", value: RESULTS.n_trials_total},
+  ];
+  const el = document.getElementById("metricCards");
+  cards.forEach(c=>{
+    const div = document.createElement("div");
+    div.className = "metric";
+    div.innerHTML = '<div class="label">'+c.label+'</div><div class="value">'+c.value+'</div>';
+    el.appendChild(div);
+  });
+})();
+</script>
+</body>
+</html>
