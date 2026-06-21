@@ -4,7 +4,7 @@ An open-source motor-imagery brain-computer interface (BCI). It classifies
 whether a person is imagining moving their **left hand**, **right hand**, or
 **feet**, using EEG signals alone, built entirely on free public data.
 
-**[Live site →](#)** &nbsp;&middot;&nbsp; **[Preprint →](#)** (add links once deployed/published)
+**[Live site →](https://tanveersubscriptions-stack.github.io/motormind/)** &nbsp;&middot;&nbsp; **[Preprint →](#)** (add once published)
 
 ## Why this project
 
