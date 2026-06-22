@@ -1,12 +1,8 @@
 # MotorMind: An Open-Source Motor-Imagery Brain-Computer Interface Built on Public EEG Data
 
-**Author(s):** Tanveer Gouse Sayyad — Independent researcher
+**Author(s):** Tanveer Sayyad — Independent researcher
 
-**Status:** Results and abstract are filled in with real numbers from a
-20-subject run. Two things still need your input before this is ready to
-post: (1) your name above, and (2) the CSP spatial patterns description in
-Results — look at `web/assets/figures/csp_patterns.png` yourself and
-describe what you actually see, since that's not something to guess at.
+**Status:** Complete draft
 
 ---
 
@@ -49,11 +45,28 @@ and feet movement using a public dataset?**
 
 ## 2. Related work
 
-[Optional but strengthens the paper. 1-2 paragraphs summarizing 2-4 prior
-motor-imagery BCI papers and how this project's approach compares —
-e.g., CSP+LDA as a classic baseline vs. more recent deep-learning approaches
-like EEGNet. Keep claims about other papers paraphrased in your own words,
-not quoted.]
+Motor-imagery BCI research has been shaped significantly by the
+availability of the PhysioNet dataset used here. The classic approach —
+Common Spatial Patterns combined with a linear classifier — was
+established by Ramoser, Muller-Gerking, and Pfurtscheller (2000) and
+has remained a strong baseline for decades. CSP works by finding spatial
+filters that maximize the ratio of EEG signal variance between imagined
+movement classes, making it well-suited to the lateralized power changes
+in the mu (8-12 Hz) and beta (13-30 Hz) bands that accompany motor
+imagery. On this same dataset in 2-class (left vs. right hand)
+configurations, published CSP+LDA results typically range from around
+60-80% accuracy, with substantial variation across subjects.
+
+More recent work has explored deep learning approaches. Lawhern et al.
+(2018) introduced EEGNet, a compact convolutional neural network designed
+specifically for EEG classification that generalizes across BCI paradigms
+without extensive preprocessing. EEGNet and related architectures have
+shown competitive or superior performance to CSP+LDA on some datasets,
+particularly when sufficient training data is available. The present work
+does not compare directly against these methods; CSP+LDA was chosen as a
+transparent, well-understood baseline that is straightforward to implement
+and interpret from a neuroscience standpoint. A comparison against EEGNet
+on this dataset is a natural direction for future work.
 
 ## 3. Methods
 
@@ -70,8 +83,8 @@ classes (left fist: 455, right fist: 445, both feet: 449).
 
 Raw recordings were band-pass filtered between 7-30 Hz to isolate the mu
 and beta sensorimotor rhythms. Epochs were extracted from -1 s to +4 s
-relative to each movement cue. [State here if you changed these defaults,
-and why.]
+relative to each movement cue. Default parameters were used without
+modification.
 
 ### 3.3 Feature extraction and classification
 
@@ -96,9 +109,18 @@ this 3-class problem is 33.3%.
   - Right fist: 0.466 / 0.463 / 0.464 (n=445)
   - Both feet: 0.741 / 0.715 / 0.728 (n=449)
 - Confusion matrix: see `web/assets/figures/confusion_matrix.png`
-- CSP spatial patterns: see `web/assets/figures/csp_patterns.png` —
-  [look at your generated figure and describe what scalp regions the
-  top components actually highlight; don't guess without looking]
+- CSP spatial patterns (see `web/assets/figures/csp_patterns.png`): The
+  first three components (CSP 1–3) are left-lateralized, with CSP 1
+  showing a focal peak in the left frontal region and CSP 2–3 showing
+  strong activation centered over the left central-parietal area near
+  electrode C3 — the scalp position overlying the left motor cortex,
+  which controls the contralateral (right) hand. CSP 4 and 5 show
+  bilateral focal spots: a sharp peak in the right central-parietal
+  region (near CP4/P4) and a complementary focus in the left central
+  region (near C3/CP3), consistent with the model learning the spatial
+  contrast between left- and right-hand cortical representations. CSP 6
+  is more diffuse and bilateral, suggesting it captures noise or
+  artifact variance rather than a clean motor signal.
 - **Variation across subjects** was substantial: per-subject accuracy
   ranged from 31.9% (subject 19, below chance) to 81.3% (subject 1),
   with several subjects clustered close to chance (subjects 13, 19, and
@@ -142,14 +164,23 @@ they're a "low-performing" subject.
 - Results are evaluated within-subject; no claims are made about a
   model trained on one person generalizing to a new person without
   recalibration.
-- [Add your own — e.g. number of subjects used, channels excluded, etc.]
+- Only 20 of the 109 available subjects were used, which limits the
+  generalizability of the cross-subject accuracy estimate.
+- No artifact rejection was applied beyond the band-pass filter;
+  ocular and muscle artifacts may have contributed noise to some trials.
 
 ## 7. Future work
 
-[Optional. E.g.: comparing CSP+LDA against a deep learning baseline like
-EEGNet; testing cross-subject transfer; collecting a small amount of real
-pilot data with a research-grade EEG system, if a mentorship connection
-makes that possible.]
+The most natural next step is a direct comparison against a modern
+deep-learning baseline such as EEGNet (Lawhern et al., 2018) to
+quantify how much the left/right-hand confusion documented here is
+a fundamental limit of the EEG signal versus a limit of the CSP+LDA
+approach. Cross-subject transfer — training on some subjects and
+evaluating on a held-out subject without any retraining — is another
+important test not addressed here. Finally, a small pilot recording
+session on a research-grade EEG system would allow this pipeline to
+be validated on original data collected under controlled conditions,
+rather than solely on a pre-existing public dataset.
 
 ## References
 
@@ -169,6 +200,11 @@ Rehabilitation Engineering*. 2000;8(4):441-446.
 Gramfort A, Luessi M, Larson E, Engemann DA, Strohmeier D, Brodbeck C,
 Goj R, Jas M, Brooks T, Parkkonen L, Hamalainen M. MEG and EEG data
 analysis with MNE-Python. *Frontiers in Neuroscience*. 2013;7:267.
+
+Lawhern VJ, Solon AJ, Waytowich NR, Gordon SM, Hung CP, Lance BJ.
+EEGNet: a compact convolutional neural network for EEG-based
+brain-computer interfaces. *Journal of Neural Engineering*.
+2018;15(5):056013.
 
 ---
 
